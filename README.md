@@ -15,4 +15,4 @@ trdg 1.8.0
 ### Disclaimer
 The repo is only tested with English language and may not be supported with the other languages.
 ### Acknowledge
-The repo is the modified verision of [EasyOCR]("https://github.com/JaidedAI/EasyOCR/blob/master/README.md">). Please head to the [EasyOCR Repo]("https://github.com/JaidedAI/EasyOCR/tree/master">) to modify ```model_arch.py``` based on your preference.. 
+The repo is the modified verision of [EasyOCR](https://github.com/JaidedAI/EasyOCR/blob/master/README.md). Please head to the [EasyOCR Repo](https://github.com/JaidedAI/EasyOCR/tree/master) to modify ```model_arch.py``` based on your preference.. 
