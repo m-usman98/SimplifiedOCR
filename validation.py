@@ -1,17 +1,29 @@
-import argparse
-import os
 import time
-import matplotlib.pyplot as plt
-import pandas as pd
+from utils.label_converter import Averager
 import torch
-import torchvision
-import torchvision.transforms as transforms
 import torch.nn.functional as F
 from network.model_arch import Model
-import torch.optim as optim
 from dataloader import load_dataset
-from utils.label_converter import CTCLabelConverter, Averager
+from utils.label_converter import CTCLabelConverter
+import argparse
+from network.init_weights import init_modeL_weights
 from nltk.metrics.distance import edit_distance
+
+parser = argparse.ArgumentParser(description="Mobile OCR Project")
+parser.add_argument("--NUM_WORKERS", default=1, type=int)
+parser.add_argument("--IMAGE_HEIGHT", default=64, type=int)
+parser.add_argument("--IMAGE_WIDTH", default=600, type=int)
+parser.add_argument("--BATCH_SIZE", default=32, type=int)
+parser.add_argument("--MAX_BATCH_SIZE", default=34, type=int)
+parser.add_argument("--INPUT_CHANNELS", default=3, type=int)
+parser.add_argument("--OUTPUT_CHANNELS", default=256, type=int)
+parser.add_argument("--HIDDEN_SIZE", default=256, type=int)
+parser.add_argument("--VAL_DATA_DIR", default="./dataset/Test", type=str)
+parser.add_argument("--NUMBER", default="0123456789", type=str)
+parser.add_argument("--SYMBOL", default="!\"#$%&'()*+,-./€[]{}", type=str)
+parser.add_argument("--LANG_CHAR", default="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", type=str)
+parser.add_argument("--SAVED_MODEL", default="./checkpoints/best_model.pth", type=str)
+args = parser.parse_args()
 
 
 def validation(model, evaluation_loader, converter, device, args):
@@ -36,6 +48,7 @@ def validation(model, evaluation_loader, converter, device, args):
 
         predictions_size = torch.IntTensor([predictions.size(1)] * batch_size)
         cost = criterion(predictions.log_softmax(2).permute(1, 0, 2), text_for_loss, predictions_size, length_for_loss)
+        cost.backward()
 
         _, predictions_index = predictions.max(2)
         predictions_index = predictions_index.view(-1)
@@ -66,6 +79,27 @@ def validation(model, evaluation_loader, converter, device, args):
     norm_ED = norm_ED / float(length_of_data)
     return valid_loss_avg.val(), accuracy, norm_ED
 
-# return valid_loss_avg.val(), accuracy, norm_ED, predictions_str, confidence_score_list, labels, infer_time, length_of_data
+
+if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("The Detected Device: ", torch.cuda.get_device_name(device))
+
+    converter = CTCLabelConverter(args.NUMBER + args.SYMBOL + args.LANG_CHAR)
+    num_classes = len(converter.character)
+
+    load_val_dataset = load_dataset(args.VAL_DATA_DIR, None, args.IMAGE_HEIGHT, args.IMAGE_WIDTH)
+    print("The Total Number Of Valid Images Are:", len(load_val_dataset))
+    print("The Total Number of Classes Are: ", num_classes)
+
+    loaded_valid_tr_dataset = torch.utils.data.DataLoader(load_val_dataset, batch_size=args.BATCH_SIZE, shuffle=True,
+                                                          num_workers=args.NUM_WORKERS)
+
+    model = Model(args.INPUT_CHANNELS, args.OUTPUT_CHANNELS, args.HIDDEN_SIZE, num_classes).to(device)
+    model = init_modeL_weights(model, device)
+    model.load_state_dict(torch.load(args.SAVED_MODEL, map_location=device))
+
+    valid_loss, accuracy, norm_Ed = validation(model, loaded_valid_tr_dataset, converter, device, args)
+
+    print(f"Valid Loss: {valid_loss:.3f}, Accuracy: {accuracy:.3f}, Norm ED Accuracy: {norm_Ed:.3f} ")
 
 
